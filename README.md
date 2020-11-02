@@ -17,21 +17,22 @@ Registers an Amazon ECS task definition and deploys it to scheduled tasks in a g
 
 ## Acknowledgements
 
-This project is a fork of the [amazon-ecs-deploy-task-definition](https://github.com/aws-actions/amazon-ecs-deploy-task-definition) that has been modified and re-tooled to work with ECS scheduled tasks.  As such its initial release version starts at 2.0.0. Be sure to use the correct tag.
+This project is a fork of the [amazon-ecs-deploy-task-definition](https://github.com/aws-actions/amazon-ecs-deploy-task-definition) that has been modified and re-tooled to work with ECS scheduled tasks. As such its initial release version starts at 2.0.0. Be sure to use the correct tag.
 
 ## Usage
 
-The action assumes you have already setup 1 or more tasks to run as a scheduled task in the ECS environment. This action will update _all_ of the tasks who cluster and task ARN (without version) match existing scheduled actions. To use this action simply add the following step to your deploy process:
+The action assumes you have already setup 1 or more tasks to run as a scheduled task in the ECS environment. This action will update _all_ of the tasks who cluster, task ARN (without version), and rule-prefix match existing scheduled actions or cloudwatch events. To use this action simply add the following step to your deploy process:
 
 ```yaml
 - name: Deploy to Amazon ECS Scheduled Tasks
   uses: airfordable/ecs-deploy-task-definition-to-scheduled-task@v2.0.0
   with:
-    cluster: my-cluster
+    cluster: my-cluster (optional, defaults to 'default')
+    rule-prefix: my-rule-prefix (optional, defaults to '')
     task-definition: task-definition.json
 ```
 
-The action can be passed a `task-definition` generated dynamically via [the `aws-actions/amazon-ecs-render-task-definition` action](https://github.com/aws-actions/amazon-ecs-render-task-definition).
+The action requires a `task-definition`. Your `task-definition` will likely be dynamically generated via [the `aws-actions/amazon-ecs-render-task-definition` action](https://github.com/aws-actions/amazon-ecs-render-task-definition) or equivalent action.
 
 See [action.yml](action.yml) for the full documentation for this action's inputs and outputs.
 
@@ -57,19 +58,31 @@ This action requires the following minimum set of permissions:
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "RegisterTaskDefinition",
-      "Effect": "Allow",
       "Action": ["ecs:RegisterTaskDefinition"],
-      "Resource": "*"
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "RegisterTaskDefinition"
     },
     {
-      "Sid": "PassRolesInTaskDefinition",
+      "Action": ["events:ListRules", "events:ListTargetsByRule"],
       "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "ListRulesAndTargets"
+    },
+    {
+      "Action": ["events:PutTargets"],
+      "Effect": "Allow",
+      "Resource": "arn:aws:events::<aws_account_id>:rule/<cloudwatch_event_rule_name>",
+      "Sid": "PutTargets"
+    },
+    {
       "Action": ["iam:PassRole"],
+      "Effect": "Allow",
       "Resource": [
         "arn:aws:iam::<aws_account_id>:role/<task_definition_task_role_name>",
         "arn:aws:iam::<aws_account_id>:role/<task_definition_task_execution_role_name>"
-      ]
+      ],
+      "Sid": "PassRolesInTaskDefinition"
     }
   ]
 }
